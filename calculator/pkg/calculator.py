@@ -13,11 +13,14 @@ class Calculator:
             "-": 1,
             "*": 2,
             "/": 2,
+            "(": 0, # Parentheses have the lowest precedence on the stack
         }
 
     def evaluate(self, expression):
         if not expression or expression.isspace():
             return None
+        # Add spaces around parentheses to ensure they are tokenized correctly
+        expression = expression.replace("(", " ( ").replace(")", " ) ")
         tokens = expression.strip().split()
         return self._evaluate_infix(tokens)
 
@@ -26,11 +29,19 @@ class Calculator:
         operators = []
 
         for token in tokens:
-            if token in self.operators:
+            if token == "(":
+                operators.append(token)
+            elif token == ")":
+                while operators and operators[-1] != "(":
+                    self._apply_operator(operators, values)
+                if not operators or operators[-1] != "(":
+                    raise ValueError("mismatched parentheses")
+                operators.pop()  # Pop the opening parenthesis
+            elif token in self.operators:
                 while (
                     operators
-                    and operators[-1] in self.operators
-                    and self.precedence[operators[-1]] >= self.precedence[token]
+                    and operators[-1] != "("
+                    and self.precedence.get(operators[-1], 0) >= self.precedence[token]
                 ):
                     self._apply_operator(operators, values)
                 operators.append(token)
@@ -41,6 +52,8 @@ class Calculator:
                     raise ValueError(f"invalid token: {token}")
 
         while operators:
+            if operators[-1] == "(":
+                raise ValueError("mismatched parentheses")
             self._apply_operator(operators, values)
 
         if len(values) != 1:

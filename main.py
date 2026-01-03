@@ -1,5 +1,4 @@
 import os
-import sys
 from xmlrpc import client
 from dotenv import load_dotenv
 from google import genai
@@ -44,8 +43,7 @@ def main():
     
     messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
     
-    function_responses = []
-    
+
     for _ in range(20):
         response = llm_call(client, messages, args)
         if response.candidates is None or len(response.candidates) == 0:
@@ -54,21 +52,22 @@ def main():
         if response.function_calls is not None:
             for function_call in response.function_calls:
                 function_call_result = call_function(function_call)
-                if function_call_result.parts is None:
+                if function_call_result.parts is None or len(function_call_result.parts) == 0:
                     raise Exception("Function call returned no parts.")
-                if function_call_result.parts[0].function_response.response is None:
+                part = function_call_result.parts[0]
+                func_resp = getattr(getattr(part, "function_response", None), "response", None)
+                if func_resp is None:
                     raise Exception("Function call returned no response.")
                 if args.verbose:
-                    print(f"Function call result: {function_call_result.parts[0].function_response.response}")
-                function_responses.append(function_call_result.parts[0])
-        messages.append(types.Content(role="user", parts=function_responses))
+                    print(f"Function call result: {func_resp}")
+                # Append the function response as a function message so the model sees the output
+                messages.append(types.Content(role="function", parts=[part]))
         if response.function_calls is None or len(response.function_calls) == 0:
-            print("Final Response:")
-            print(response.text)
-            break
+             print("Final Response:")
+             print(response.text)
+             break
         if _ == 19:
             print("Max iterations reached without final response.")
-            sys.exit(1)
     else:
         print("Response:")
         print(response.text)
